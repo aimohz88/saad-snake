@@ -5,3 +5,5 @@ A phone snake game where the snake is the name سعد. Each thing he eats adds a
 Play: https://saad-snake.netlify.app
 
 Everything is in `index.html`.
+
+Pushing to `main` deploys automatically to Netlify.
