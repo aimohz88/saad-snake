@@ -1,0 +1,657 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#f4ead5">
+<title>ثعبان سعد</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Reem+Kufi:wght@700&family=Tajawal:wght@500;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --sand: #f4ead5;
+    --tile-a: #f9f1de;
+    --tile-b: #f0e3c4;
+    --ink: #1e6b46;
+    --ink-dark: #13492f;
+    --accent: #c8512b;
+    --text: #3b2a1a;
+    --muted: #8a7559;
+    --card: #fffaf0;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+  html, body { height: 100%; background: var(--sand); color: var(--text); overflow: hidden; overscroll-behavior: none; }
+  body { font-family: 'Tajawal', system-ui, sans-serif; user-select: none; -webkit-user-select: none; }
+  button { font: inherit; color: inherit; border: 0; background: none; cursor: pointer; touch-action: manipulation; }
+
+  #app {
+    height: 100vh; height: 100dvh;
+    display: flex; flex-direction: column; align-items: center;
+    padding: calc(env(safe-area-inset-top) + 8px) 16px calc(env(safe-area-inset-bottom) + 10px);
+    touch-action: none;
+  }
+
+  /* HUD */
+  #hud { width: 100%; max-width: 520px; display: flex; align-items: center; gap: 10px; padding-bottom: 8px; }
+  .stat { display: flex; flex-direction: column; line-height: 1.1; min-width: 52px; }
+  .stat span { font-size: 12px; color: var(--muted); font-weight: 500; }
+  .stat b { font-size: 24px; font-weight: 800; font-variant-numeric: tabular-nums; }
+  .slow { background: #6b3f1f; color: #fff; border-radius: 999px; padding: 4px 10px; font-weight: 800; font-size: 15px; }
+  .spacer { flex: 1; }
+  .icon { width: 44px; height: 44px; border-radius: 12px; background: var(--card); box-shadow: 0 1px 0 rgba(0,0,0,.08), 0 2px 6px rgba(80,50,10,.12); display: grid; place-items: center; }
+  .icon svg { width: 22px; height: 22px; fill: var(--text); }
+
+  /* Board */
+  #boardWrap { flex: 1; min-height: 0; width: 100%; max-width: 520px; display: flex; align-items: center; justify-content: center; }
+  #board { display: block; border-radius: 12px; box-shadow: 0 2px 10px rgba(80,50,10,.18); outline: 3px solid var(--ink-dark); }
+  #board.wrap { outline-style: dashed; outline-color: #a88f68; }
+
+
+  /* Screens */
+  .screen {
+    position: fixed; inset: 0; z-index: 10;
+    display: flex; align-items: center; justify-content: center;
+    padding: calc(env(safe-area-inset-top) + 16px) 16px calc(env(safe-area-inset-bottom) + 16px);
+    background: rgba(244, 234, 213, .88);
+    -webkit-backdrop-filter: blur(4px); backdrop-filter: blur(4px);
+    overflow-y: auto; touch-action: pan-y;
+  }
+  .screen[hidden] { display: none; }
+  .card {
+    width: 100%; max-width: 400px; margin: auto;
+    background: var(--card); border-radius: 22px; padding: 24px 20px;
+    box-shadow: 0 8px 30px rgba(80,50,10,.18);
+    display: flex; flex-direction: column; gap: 12px; text-align: center;
+  }
+  .eyebrow { font-size: 14px; color: var(--muted); font-weight: 800; }
+  .name {
+    font-family: 'Reem Kufi', 'Tajawal', sans-serif; font-weight: 700; color: var(--ink);
+    font-size: 56px; line-height: 1.5; min-height: 1.5em; word-break: break-all;
+  }
+  .lead { font-size: 15px; color: var(--text); line-height: 1.7; }
+  .lead .k { font-family: 'Reem Kufi', sans-serif; color: var(--ink); font-weight: 700; }
+  .modes { display: flex; flex-direction: column; gap: 10px; margin-top: 4px; }
+  .mode {
+    display: grid; grid-template-columns: 1fr auto; align-items: center; text-align: right;
+    padding: 12px 16px; border-radius: 16px; background: #f6ecd6;
+    box-shadow: inset 0 0 0 2px #e6d4ae;
+  }
+  .mode:active { background: #efe0bf; }
+  .m-name { font-size: 22px; font-weight: 800; color: var(--ink-dark); }
+  .m-desc { grid-column: 1; font-size: 13px; color: var(--muted); }
+  .m-best { grid-column: 2; grid-row: 1 / span 2; font-size: 12px; color: var(--muted); text-align: center; line-height: 1.2; }
+  .m-best b { display: block; font-size: 22px; color: var(--text); }
+  .howto { font-size: 13px; color: var(--muted); line-height: 1.7; }
+  .primary, .secondary, .ghost { min-height: 50px; border-radius: 14px; font-size: 18px; font-weight: 800; }
+  .primary { background: var(--ink); color: #fff; box-shadow: 0 3px 0 var(--ink-dark); }
+  .primary:active { transform: translateY(2px); box-shadow: none; }
+  .secondary { background: #25d366; color: #fff; box-shadow: 0 3px 0 #1a9e4c; }
+  .secondary:active { transform: translateY(2px); box-shadow: none; }
+  .ghost { color: var(--muted); font-size: 16px; min-height: 44px; }
+  .stats { display: flex; gap: 10px; }
+  .stats div { flex: 1; background: #f6ecd6; border-radius: 14px; padding: 10px; display: flex; flex-direction: column; }
+  .stats span { font-size: 13px; color: var(--muted); }
+  .stats b { font-size: 30px; font-weight: 800; font-variant-numeric: tabular-nums; }
+  .badge { background: #fff1c2; color: #8a5a00; border-radius: 12px; padding: 8px; font-weight: 800; }
+  .badge[hidden] { display: none; }
+</style>
+</head>
+<body>
+<div id="app">
+  <header id="hud">
+    <div class="stat"><span>النقاط</span><b id="score">0</b></div>
+    <div class="stat"><span>الأفضل</span><b id="best">0</b></div>
+    <div id="slow" class="slow" hidden>☕ <span id="slowN">5</span></div>
+    <div class="spacer"></div>
+    <button id="mute" class="icon" aria-label="الصوت"></button>
+    <button id="pauseBtn" class="icon" aria-label="إيقاف مؤقت">
+      <svg viewBox="0 0 24 24"><rect x="6" y="5" width="4" height="14" rx="1.5"/><rect x="14" y="5" width="4" height="14" rx="1.5"/></svg>
+    </button>
+  </header>
+
+  <div id="boardWrap"><canvas id="board"></canvas></div>
+</div>
+
+<section id="start" class="screen">
+  <div class="card">
+    <div class="eyebrow">لعبة الثعبان</div>
+    <div id="titleName" class="name">سعد</div>
+    <p class="lead">كلما أكل سعد شيئًا طال <span class="k">ذيـــــلـــــهــــ</span><br><span class="k">سعد ← ـسعد ← ــسعد ← ـــسعد</span></p>
+    <div class="modes">
+      <button class="mode" data-mode="easy">
+        <span class="m-name">سهل</span>
+        <span class="m-best">الأفضل<b id="best-easy">0</b></span>
+        <span class="m-desc">أبطأ، والجدار يعيدك من الجهة الأخرى</span>
+      </button>
+      <button class="mode" data-mode="normal">
+        <span class="m-name">عادي</span>
+        <span class="m-best">الأفضل<b id="best-normal">0</b></span>
+        <span class="m-desc">لمس الجدار ينهي اللعبة</span>
+      </button>
+      <button class="mode" data-mode="hard">
+        <span class="m-name">صعب</span>
+        <span class="m-best">الأفضل<b id="best-hard">0</b></span>
+        <span class="m-desc">أسرع، مع صخور في الطريق</span>
+      </button>
+    </div>
+    <p class="howto">المس يمين الشاشة ليلتفّ سعد مع عقارب الساعة ↻<br>والمس يسارها ليلتفّ عكس عقارب الساعة ↺<br>☕ القهوة تبطّئ سعد خمس ثوانٍ.</p>
+  </div>
+</section>
+
+<section id="pause" class="screen" hidden>
+  <div class="card">
+    <div class="name" style="font-size:40px">استراحة</div>
+    <button id="resume" class="primary">أكمل اللعب</button>
+    <button id="pauseMenu" class="ghost">القائمة</button>
+  </div>
+</section>
+
+<section id="over" class="screen" hidden>
+  <div class="card">
+    <div id="overTitle" class="eyebrow">انتهت اللعبة</div>
+    <div id="overName" class="name"></div>
+    <div id="newBest" class="badge" hidden>🎉 رقم قياسي جديد!</div>
+    <div class="stats">
+      <div><span>النتيجة</span><b id="overScore">0</b></div>
+      <div><span id="overBestLabel">الأفضل</span><b id="overBest">0</b></div>
+    </div>
+    <button id="again" class="primary">العب مرة أخرى</button>
+    <button id="share" class="secondary">شارك النتيجة</button>
+    <button id="overMenu" class="ghost">القائمة</button>
+  </div>
+</section>
+
+<script>
+(() => {
+  const $ = id => document.getElementById(id);
+
+  // Saved settings: wrapped so private browsing or blocked storage never breaks the game.
+  const store = {
+    get(k, d) { try { const v = localStorage.getItem(k); return v === null ? d : JSON.parse(v); } catch (e) { return d; } },
+    set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} },
+  };
+
+  const MODES = {
+    easy:   { name: 'سهل',  start: 190, min: 120, dec: 2,   wrap: true,  rocks: 0 },
+    normal: { name: 'عادي', start: 150, min: 80,  dec: 2.5, wrap: false, rocks: 0 },
+    hard:   { name: 'صعب',  start: 115, min: 60,  dec: 2.5, wrap: false, rocks: 7 },
+  };
+  const FRUITS = ['🍎', '🍇', '🍉', '🍓', '🍌', '🍊', '🥭', '🍒', '🍑', '🍍', '🍐', '🥝'];
+  const BURST = ['#e74c3c', '#f39c12', '#8e44ad', '#27ae60', '#e67e22'];
+  const COLS = 12;
+  const SLOW_MS = 5000, COFFEE_MS = 8000;
+  const TATWEEL = 'ـ', ZWJ = '‍';
+  // Each letter is drawn in its own cell; zero-width joiners force the joined (connected) letter shapes.
+  const GLYPHS = { dal: ZWJ + 'د', ain: ZWJ + 'ع' + ZWJ, seenInit: 'س' + ZWJ, seenMid: ZWJ + 'س' + ZWJ };
+  const SNAKE_FONT = '"Reem Kufi", "Noto Kufi Arabic", Tahoma, sans-serif';
+  const EMOJI_FONT = '"Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", sans-serif';
+  const DIRS = { up: { x: 0, y: -1 }, down: { x: 0, y: 1 }, left: { x: -1, y: 0 }, right: { x: 1, y: 0 } };
+  const INK = '#1e6b46', DEAD = '#b23a2a';
+
+  const canvas = $('board'), ctx = canvas.getContext('2d');
+  let cell = 20, rows = 20, W = 0, H = 0, M = null;
+  let S = null;
+  let muted = store.get('saad.muted', false);
+  const best = Object.assign({ easy: 0, normal: 0, hard: 0 }, store.get('saad.best', {}));
+  let audio = null;
+
+  const elongated = n => TATWEEL.repeat(Math.min(n, 40)) + 'سعد';
+  const rand = n => Math.floor(Math.random() * n);
+  const same = (a, b) => a && b && a.x === b.x && a.y === b.y;
+  const center = p => ({ x: p.x * cell + cell / 2, y: p.y * cell + cell / 2 });
+
+  // ---------- sizing ----------
+  function fitBoard(newGame) {
+    const wrap = $('boardWrap');
+    const w = wrap.clientWidth, h = wrap.clientHeight;
+    if (newGame) {
+      const c = Math.floor(w / COLS);
+      rows = Math.max(12, Math.min(24, Math.floor(h / c)));
+    }
+    cell = Math.max(10, Math.floor(Math.min(w / COLS, h / rows)));
+    W = cell * COLS; H = cell * rows;
+    const dpr = Math.min(window.devicePixelRatio || 1, 3);
+    canvas.width = W * dpr; canvas.height = H * dpr;
+    canvas.style.width = W + 'px'; canvas.style.height = H + 'px';
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    M = measure();
+  }
+
+  // Find where the font's tatweel bar sits, so the body line and the letters join up.
+  function measure() {
+    const fs = Math.round(cell * 1.55);
+    ctx.font = `700 ${fs}px ${SNAKE_FONT}`;
+    const m = ctx.measureText(TATWEEL);
+    let asc = m.actualBoundingBoxAscent, desc = m.actualBoundingBoxDescent;
+    let t = asc + desc;
+    if (!(t > 0) || t > cell) { t = cell * 0.12; asc = fs * 0.12; desc = asc - t; }
+    // A little thicker than the font's own tatweel so the trail is easy to see; the letters
+    // only get a light outline so their shapes stay readable.
+    const body = Math.max(t * 1.3, cell * 0.22);
+    const glyphs = {};
+    for (const k in GLYPHS) {
+      const adv = ctx.measureText(GLYPHS[k]).width || cell;
+      glyphs[k] = { g: GLYPHS[k], sx: Math.max(0.55, Math.min(1.7, cell / adv)) };
+    }
+    return { fs, offY: (asc - desc) / 2, body, extra: Math.min(body - t, cell * 0.05), glyphs };
+  }
+
+  // ---------- sound & vibration ----------
+  function initAudio() {
+    try {
+      if (!audio) audio = new (window.AudioContext || window.webkitAudioContext)();
+      if (audio.state === 'suspended') audio.resume();
+    } catch (e) {}
+  }
+  function tone(f1, f2, dur, type, vol, delay) {
+    if (muted || !audio) return;
+    const t = audio.currentTime + (delay || 0);
+    const o = audio.createOscillator(), g = audio.createGain();
+    o.type = type || 'sine';
+    o.frequency.setValueAtTime(f1, t);
+    if (f2) o.frequency.exponentialRampToValueAtTime(f2, t + dur);
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(vol || 0.18, t + 0.01);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    o.connect(g); g.connect(audio.destination);
+    o.start(t); o.stop(t + dur + 0.03);
+  }
+  const sfx = {
+    eat()    { tone(520, 880, 0.09, 'triangle', 0.22); },
+    coffee() { tone(440, 330, 0.12, 'sine', 0.2); tone(660, 440, 0.16, 'sine', 0.16, 0.1); },
+    over()   { tone(380, 80, 0.55, 'sawtooth', 0.12); },
+    best()   { [523, 659, 784, 1047].forEach((f, i) => tone(f, 0, 0.16, 'triangle', 0.16, i * 0.11)); },
+    tap()    { tone(660, 0, 0.04, 'square', 0.05); },
+  };
+  function vib(p) { try { if (navigator.vibrate) navigator.vibrate(p); } catch (e) {} }
+
+  function renderMute() {
+    $('mute').innerHTML = muted
+      ? '<svg viewBox="0 0 24 24"><path d="M4 9h4l5-4v14l-5-4H4z"/><path d="M16 9l5 6M21 9l-5 6" stroke="#3b2a1a" stroke-width="2" stroke-linecap="round"/></svg>'
+      : '<svg viewBox="0 0 24 24"><path d="M4 9h4l5-4v14l-5-4H4z"/><path d="M16 8.5a5 5 0 010 7M18.5 6a8.5 8.5 0 010 12" fill="none" stroke="#3b2a1a" stroke-width="2" stroke-linecap="round"/></svg>';
+  }
+
+  // ---------- game ----------
+  function newGame(modeKey) {
+    initAudio();
+    show(null);
+    fitBoard(true);
+    const mode = MODES[modeKey];
+    const y = Math.floor(rows / 2), x = Math.floor(COLS / 2) - 1;
+    S = {
+      modeKey, mode,
+      // index 0 = د (head), 1 = ع, 2 = س, then one ـ per thing eaten
+      snake: [{ x, y }, { x: x + 1, y }, { x: x + 2, y }],
+      dir: DIRS.left, lastDir: DIRS.left, queue: [],
+      food: null, coffee: null, rocks: [],
+      score: 0, eaten: 0, slowLeft: 0, acc: 0, last: performance.now(),
+      state: 'run', deadAt: 0, won: false, particles: [], floaters: [],
+    };
+    canvas.classList.toggle('wrap', mode.wrap);
+    shownSlow = 0; $('slow').hidden = true;
+    placeRocks();
+    spawnFood(performance.now());
+    updateHud();
+  }
+
+  function occupied(p) {
+    return S.snake.some(s => same(s, p)) || S.rocks.some(r => same(r, p)) || same(S.food, p) || same(S.coffee, p);
+  }
+  function emptyCell() {
+    const free = [];
+    for (let y = 0; y < rows; y++) for (let x = 0; x < COLS; x++) if (!occupied({ x, y })) free.push({ x, y });
+    return free.length ? free[rand(free.length)] : null;
+  }
+  function placeRocks() {
+    const sy = S.snake[0].y;
+    let tries = 0;
+    while (S.rocks.length < S.mode.rocks && tries++ < 500) {
+      const p = { x: rand(COLS), y: rand(rows) };
+      if (Math.abs(p.y - sy) <= 1 || occupied(p)) continue;
+      S.rocks.push(p);
+    }
+  }
+  function spawnFood(now) {
+    const p = emptyCell();
+    S.food = p ? { x: p.x, y: p.y, ch: FRUITS[rand(FRUITS.length)], born: now } : null;
+  }
+  function maybeCoffee(now) {
+    if (S.coffee || S.eaten < 3 || Math.random() > 0.22) return;
+    const p = emptyCell();
+    if (p) S.coffee = { x: p.x, y: p.y, left: COFFEE_MS, born: now };
+  }
+
+  function turn(name) {
+    if (!S || S.state !== 'run') return;
+    const d = DIRS[name];
+    const prev = heading();
+    if ((d.x === -prev.x && d.y === -prev.y) || (d.x === prev.x && d.y === prev.y)) return;
+    if (S.queue.length < 3) S.queue.push(d);
+  }
+
+  // Turn to سعد's own left or right, relative to where he is (or is about to be) heading.
+  function turnSide(side) {
+    if (!S || S.state !== 'run' || S.queue.length >= 3) return;
+    const p = heading();
+    S.queue.push(side === 'left' ? { x: p.y, y: -p.x } : { x: -p.y, y: p.x });
+  }
+
+  function heading() { return S.queue.length ? S.queue[S.queue.length - 1] : S.dir; }
+
+  function interval() {
+    const base = Math.max(S.mode.min, S.mode.start - S.eaten * S.mode.dec);
+    return S.slowLeft > 0 ? base * 1.7 : base;
+  }
+
+  function step(now) {
+    if (S.queue.length) S.dir = S.queue.shift();
+    const h = S.snake[0];
+    let nx = h.x + S.dir.x, ny = h.y + S.dir.y;
+    if (S.mode.wrap) { nx = (nx + COLS) % COLS; ny = (ny + rows) % rows; }
+    else if (nx < 0 || ny < 0 || nx >= COLS || ny >= rows) return die(now);
+    const next = { x: nx, y: ny };
+    const eatsFood = same(S.food, next), eatsCoffee = same(S.coffee, next);
+    // The tail moves out of the way this step unless the snake is growing.
+    const body = (eatsFood || eatsCoffee) ? S.snake : S.snake.slice(0, -1);
+    if (body.some(p => same(p, next)) || S.rocks.some(r => same(r, next))) return die(now);
+
+    S.snake.unshift(next);
+    S.lastDir = S.dir;
+    if (eatsFood) {
+      S.score++; S.eaten++;
+      burst(next, now); floater(next, '+1', now);
+      sfx.eat(); vib(25);
+      spawnFood(now);
+      maybeCoffee(now);
+      if (!S.food && !emptyCell()) { S.won = true; return die(now); }
+    } else if (eatsCoffee) {
+      S.score++; S.coffee = null; S.slowLeft = SLOW_MS;
+      burst(next, now, ['#6b3f1f', '#a0703f', '#d9b48f']); floater(next, 'أبطأ!', now);
+      sfx.coffee(); vib([20, 40, 20]);
+    } else {
+      S.snake.pop();
+    }
+    updateHud();
+  }
+
+  function die(now) {
+    S.state = 'dead'; S.deadAt = now;
+    sfx.over(); vib([90, 60, 160]);
+    const isBest = S.score > 0 && S.score > (best[S.modeKey] || 0);
+    if (isBest) { best[S.modeKey] = S.score; store.set('saad.best', best); }
+    setTimeout(() => showGameOver(isBest), 750);
+  }
+
+  function burst(p, now, colors) {
+    const c = center(p);
+    for (let i = 0; i < 10; i++) {
+      const a = Math.random() * Math.PI * 2, v = 0.04 + Math.random() * 0.08;
+      S.particles.push({ x: c.x, y: c.y, vx: Math.cos(a) * v * cell, vy: Math.sin(a) * v * cell, born: now,
+        color: (colors || BURST)[rand((colors || BURST).length)] });
+    }
+  }
+  function floater(p, text, now) { const c = center(p); S.floaters.push({ x: c.x, y: c.y, text, born: now }); }
+
+  // ---------- drawing ----------
+  function drawBoard() {
+    ctx.fillStyle = getVar('--tile-a');
+    ctx.fillRect(0, 0, W, H);
+    ctx.fillStyle = getVar('--tile-b');
+    for (let y = 0; y < rows; y++) for (let x = (y % 2); x < COLS; x += 2) ctx.fillRect(x * cell, y * cell, cell, cell);
+  }
+  const varCache = {};
+  function getVar(n) { return varCache[n] || (varCache[n] = getComputedStyle(document.documentElement).getPropertyValue(n).trim()); }
+
+  function drawRock(p) {
+    const x = p.x * cell, y = p.y * cell, r = cell * 0.25, i = cell * 0.08;
+    ctx.fillStyle = '#8f7f68';
+    roundRect(x + i, y + i, cell - 2 * i, cell - 2 * i, r); ctx.fill();
+    ctx.fillStyle = 'rgba(255,255,255,.25)';
+    roundRect(x + i * 2, y + i * 2, cell * 0.45, cell * 0.22, r * 0.6); ctx.fill();
+  }
+  function roundRect(x, y, w, h, r) {
+    ctx.beginPath();
+    ctx.moveTo(x + r, y); ctx.arcTo(x + w, y, x + w, y + h, r); ctx.arcTo(x + w, y + h, x, y + h, r);
+    ctx.arcTo(x, y + h, x, y, r); ctx.arcTo(x, y, x + w, y, r); ctx.closePath();
+  }
+
+  function drawEmoji(ch, p, scale) {
+    const c = center(p);
+    ctx.save();
+    ctx.translate(c.x, c.y); ctx.scale(scale, scale);
+    ctx.font = `${Math.round(cell * 0.82)}px ${EMOJI_FONT}`;
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText(ch, 0, cell * 0.05);
+    ctx.restore();
+  }
+
+  // Direction from cell a to its neighbour b, allowing for wrap-around at the edges.
+  function stepDir(a, b) {
+    let dx = b.x - a.x, dy = b.y - a.y;
+    if (dx > 1) dx = -1; else if (dx < -1) dx = 1;
+    if (dy > 1) dy = -1; else if (dy < -1) dy = 1;
+    return { x: dx, y: dy };
+  }
+
+  function drawSnake(now) {
+    const sn = S.snake;
+    const dead = S.state === 'dead';
+    const color = dead && Math.floor((now - S.deadAt) / 120) % 2 ? DEAD : INK;
+
+    // The stretched tatweel: one continuous ink line from the tail to the head.
+    ctx.save();
+    ctx.strokeStyle = color; ctx.lineWidth = M.body; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+    ctx.shadowColor = 'rgba(70,45,10,.25)'; ctx.shadowBlur = cell * 0.15; ctx.shadowOffsetY = cell * 0.08;
+    ctx.beginPath();
+    for (let i = sn.length - 1; i >= 0; i--) {
+      const c = center(sn[i]);
+      if (i === sn.length - 1) { ctx.moveTo(c.x, c.y); continue; }
+      const q = sn[i + 1];
+      if (Math.abs(sn[i].x - q.x) + Math.abs(sn[i].y - q.y) > 1) {   // crossed an edge (easy mode)
+        const d = stepDir(q, sn[i]), qc = center(q);
+        ctx.lineTo(qc.x + d.x * cell / 2, qc.y + d.y * cell / 2);
+        ctx.moveTo(c.x - d.x * cell / 2, c.y - d.y * cell / 2);
+      }
+      ctx.lineTo(c.x, c.y);
+    }
+    ctx.stroke();
+    ctx.restore();
+
+    // The letters د ع س, each turned to face the way that part of the snake is moving.
+    for (let i = Math.min(2, sn.length - 1); i >= 0; i--) {
+      const f = i === 0 ? S.lastDir : stepDir(sn[i], sn[i - 1]);
+      const key = i === 0 ? 'dal' : i === 1 ? 'ain' : (sn.length > 3 ? 'seenMid' : 'seenInit');
+      const g = M.glyphs[key], c = center(sn[i]);
+      ctx.save();
+      ctx.translate(c.x, c.y);
+      ctx.rotate(Math.atan2(-f.y, -f.x));
+      ctx.scale(g.sx, 1);
+      ctx.font = `700 ${M.fs}px ${SNAKE_FONT}`;
+      ctx.textAlign = 'center'; ctx.textBaseline = 'alphabetic';
+      ctx.fillStyle = color; ctx.strokeStyle = color; ctx.lineJoin = 'round';
+      if (M.extra > 0.5) { ctx.lineWidth = M.extra; ctx.strokeText(g.g, 0, M.offY); }
+      ctx.fillText(g.g, 0, M.offY);
+      ctx.restore();
+    }
+
+    // A little tongue that flicks out now and then.
+    if (S.state === 'run' && now % 1500 < 260) {
+      const h = center(sn[0]), f = S.lastDir, px = -f.y, py = f.x;
+      const sx = h.x + f.x * cell * 0.55, sy = h.y + f.y * cell * 0.55;
+      const ex = sx + f.x * cell * 0.3, ey = sy + f.y * cell * 0.3;
+      ctx.save();
+      ctx.strokeStyle = '#d63b3b'; ctx.lineWidth = Math.max(1.5, cell * 0.07); ctx.lineCap = 'round';
+      ctx.beginPath();
+      ctx.moveTo(sx, sy); ctx.lineTo(ex, ey);
+      ctx.moveTo(ex, ey); ctx.lineTo(ex + f.x * cell * 0.13 + px * cell * 0.1, ey + f.y * cell * 0.13 + py * cell * 0.1);
+      ctx.moveTo(ex, ey); ctx.lineTo(ex + f.x * cell * 0.13 - px * cell * 0.1, ey + f.y * cell * 0.13 - py * cell * 0.1);
+      ctx.stroke();
+      ctx.restore();
+    }
+  }
+
+  function draw(now) {
+    ctx.clearRect(0, 0, W, H);
+    drawBoard();
+    if (!S) return;
+    S.rocks.forEach(drawRock);
+
+    if (S.food) {
+      const t = Math.min(1, (now - S.food.born) / 180);
+      drawEmoji(S.food.ch, S.food, (1 - Math.pow(1 - t, 3)) * (1 + 0.05 * Math.sin(now / 240)));
+    }
+    if (S.coffee) {
+      const c = center(S.coffee);
+      const pulse = 0.5 + 0.5 * Math.sin(now / 200);
+      ctx.save();
+      ctx.fillStyle = `rgba(255, 200, 90, ${0.25 + 0.2 * pulse})`;
+      ctx.beginPath(); ctx.arc(c.x, c.y, cell * 0.62, 0, Math.PI * 2); ctx.fill();
+      ctx.strokeStyle = '#6b3f1f'; ctx.lineWidth = Math.max(2, cell * 0.08); ctx.lineCap = 'round';
+      ctx.beginPath(); ctx.arc(c.x, c.y, cell * 0.62, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * (S.coffee.left / COFFEE_MS)); ctx.stroke();
+      ctx.restore();
+      drawEmoji('☕', S.coffee, 0.95);
+    }
+
+    drawSnake(now);
+
+    S.particles = S.particles.filter(p => now - p.born < 500);
+    S.particles.forEach(p => {
+      const t = now - p.born;
+      ctx.globalAlpha = 1 - t / 500;
+      ctx.fillStyle = p.color;
+      ctx.beginPath(); ctx.arc(p.x + p.vx * t / 16, p.y + p.vy * t / 16, cell * 0.1, 0, Math.PI * 2); ctx.fill();
+    });
+    ctx.globalAlpha = 1;
+
+    S.floaters = S.floaters.filter(f => now - f.born < 800);
+    S.floaters.forEach(f => {
+      const t = (now - f.born) / 800;
+      ctx.globalAlpha = 1 - t;
+      ctx.font = `800 ${Math.round(cell * 0.75)}px Tajawal, sans-serif`;
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillStyle = '#3b2a1a';
+      ctx.fillText(f.text, f.x, f.y - cell * 0.6 - t * cell * 1.2);
+    });
+    ctx.globalAlpha = 1;
+  }
+
+  // ---------- loop ----------
+  let shownSlow = -1;
+  function frame(now) {
+    requestAnimationFrame(frame);
+    if (S && S.state === 'run') {
+      const dt = Math.min(250, now - S.last);
+      S.last = now;
+      if (S.slowLeft > 0) S.slowLeft -= dt;
+      if (S.coffee && (S.coffee.left -= dt) <= 0) S.coffee = null;
+      S.acc += dt;
+      let iv = interval();
+      while (S.acc >= iv && S.state === 'run') { S.acc -= iv; step(now); iv = interval(); }
+      const sl = S.slowLeft > 0 ? Math.ceil(S.slowLeft / 1000) : 0;
+      if (sl !== shownSlow) { shownSlow = sl; $('slow').hidden = !sl; $('slowN').textContent = sl; }
+    } else if (S) {
+      S.last = now;
+    }
+    draw(now);
+  }
+
+  // ---------- screens ----------
+  let titleTimer = null;
+  function show(id) {
+    ['start', 'pause', 'over'].forEach(s => { $(s).hidden = s !== id; });
+    clearInterval(titleTimer);
+    if (id === 'start') {
+      ['easy', 'normal', 'hard'].forEach(k => { $('best-' + k).textContent = best[k] || 0; });
+      let n = 0;
+      $('titleName').textContent = elongated(0);
+      titleTimer = setInterval(() => { n = (n + 1) % 9; $('titleName').textContent = elongated(n); }, 380);
+    }
+  }
+  function updateHud() {
+    $('score').textContent = S ? S.score : 0;
+    $('best').textContent = S ? Math.max(best[S.modeKey] || 0, S.score) : 0;
+  }
+  function showGameOver(isBest) {
+    if (!S || S.state !== 'dead') return;
+    $('overTitle').textContent = S.won ? 'ملأ سعد الملعب! 🏆' : 'انتهت اللعبة';
+    const nameEl = $('overName');
+    nameEl.textContent = elongated(S.score);
+    nameEl.style.fontSize = Math.max(24, 56 - S.score * 1.1) + 'px';
+    $('overScore').textContent = S.score;
+    $('overBestLabel').textContent = 'الأفضل (' + S.mode.name + ')';
+    $('overBest').textContent = best[S.modeKey] || 0;
+    $('newBest').hidden = !isBest;
+    show('over');
+    if (isBest) sfx.best();
+  }
+  function pause() {
+    if (!S || S.state !== 'run') return;
+    S.state = 'paused';
+    show('pause');
+  }
+  function resume() {
+    if (!S || S.state !== 'paused') return;
+    initAudio();
+    S.state = 'run';
+    show(null);
+  }
+  function toMenu() {
+    if (S) S.state = 'menu';
+    show('start');
+  }
+
+  function shareScore() {
+    if (!S) return;
+    const link = /^https?:$/.test(location.protocol) ? location.href.split('#')[0] : '';
+    const text = `صار اسمي ${elongated(S.score)} 🐍\nجمعت ${S.score} نقطة في لعبة ثعبان سعد (${S.mode.name})` +
+      (link ? `\nجرّبها: ${link}` : '');
+    if (navigator.share) navigator.share({ text }).catch(() => {});
+    else window.open('https://wa.me/?text=' + encodeURIComponent(text), '_blank');
+  }
+
+  // ---------- input ----------
+  document.querySelectorAll('.mode').forEach(b => b.addEventListener('click', () => newGame(b.dataset.mode)));
+  $('again').addEventListener('click', () => newGame(S ? S.modeKey : 'normal'));
+  $('share').addEventListener('click', shareScore);
+  $('overMenu').addEventListener('click', toMenu);
+  $('pauseMenu').addEventListener('click', toMenu);
+  $('resume').addEventListener('click', resume);
+  $('pauseBtn').addEventListener('click', () => (S && S.state === 'paused') ? resume() : pause());
+  $('mute').addEventListener('click', () => {
+    muted = !muted; store.set('saad.muted', muted); renderMute();
+    if (!muted) { initAudio(); sfx.tap(); }
+  });
+
+  // Two-side controls: tap the left half of the screen to turn to سعد's left, the right half
+  // to turn to his right.
+  $('app').addEventListener('pointerdown', e => {
+    if (!S || S.state !== 'run' || e.target.closest('button')) return;
+    e.preventDefault();
+    turnSide(e.clientX < window.innerWidth / 2 ? 'left' : 'right');
+  });
+  document.addEventListener('touchmove', e => { if (S && S.state === 'run') e.preventDefault(); }, { passive: false });
+
+  const KEYS = { ArrowUp: 'up', ArrowDown: 'down', ArrowLeft: 'left', ArrowRight: 'right', w: 'up', s: 'down', a: 'left', d: 'right' };
+  document.addEventListener('keydown', e => {
+    if (KEYS[e.key]) { e.preventDefault(); turn(KEYS[e.key]); }
+    else if (e.key === ' ' || e.key === 'Escape') { (S && S.state === 'paused') ? resume() : pause(); }
+  });
+
+  document.addEventListener('visibilitychange', () => { if (document.hidden) pause(); });
+  window.addEventListener('resize', () => { fitBoard(!S || S.state === 'menu'); });
+
+  // ---------- start ----------
+  renderMute();
+  const fontReady = document.fonts && document.fonts.load
+    ? Promise.race([document.fonts.load(`700 40px "Reem Kufi"`, 'سعد'), new Promise(r => setTimeout(r, 2500))])
+    : Promise.resolve();
+  fontReady.catch(() => {}).then(() => {
+    fitBoard(true);
+    show('start');
+    requestAnimationFrame(frame);
+  });
+})();
+</script>
+</body>
+</html>
