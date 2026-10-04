@@ -7,7 +7,7 @@
 <title>حيّه</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Reem+Kufi:wght@700&family=Tajawal:wght@500;800&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Reem+Kufi:wght@400;700&family=Tajawal:wght@500;800&display=swap" rel="stylesheet">
 <style>
   :root {
     --sand: #f4ead5;
@@ -278,20 +278,18 @@
   // Find where the font's tatweel bar sits, so the body line and the letters join up.
   function measure() {
     const fs = Math.round(cell * 1.55);
-    ctx.font = `700 ${fs}px ${SNAKE_FONT}`;
+    ctx.font = `400 ${fs}px ${SNAKE_FONT}`;
     const m = ctx.measureText(TATWEEL);
     let asc = m.actualBoundingBoxAscent, desc = m.actualBoundingBoxDescent;
     let t = asc + desc;
     if (!(t > 0) || t > cell) { t = cell * 0.12; asc = fs * 0.12; desc = asc - t; }
-    // A little thicker than the font's own tatweel so the trail is easy to see; the letters
-    // only get a light outline so their shapes stay readable.
-    const body = Math.max(t * 1.3, cell * 0.22);
-    return { fs, offY: (asc - desc) / 2, body, extra: Math.min(body - t, cell * 0.05), sx: {} };
+    // The body line is exactly as thick as the font's own ـ, so it runs straight into the letters.
+    return { fs, offY: (asc - desc) / 2, body: Math.max(t, cell * 0.1), sx: {} };
   }
   // How much to squeeze or widen a letter so it fills about one cell.
   function glyphScale(g) {
     if (!(g in M.sx)) {
-      ctx.font = `700 ${M.fs}px ${SNAKE_FONT}`;
+      ctx.font = `400 ${M.fs}px ${SNAKE_FONT}`;
       M.sx[g] = Math.max(0.55, Math.min(1.35, cell / (ctx.measureText(g).width || cell)));
     }
     return M.sx[g];
@@ -640,7 +638,7 @@
     }
 
     // The letters, each turned to face the way that part of the body is moving.
-    ctx.font = `700 ${M.fs}px ${SNAKE_FONT}`;
+    ctx.font = `400 ${M.fs}px ${SNAKE_FONT}`;
     ctx.textAlign = 'center'; ctx.textBaseline = 'alphabetic';
     ctx.fillStyle = color; ctx.strokeStyle = color; ctx.lineJoin = 'round';
     for (let i = L - 1; i >= 0; i--) {
@@ -655,7 +653,6 @@
         ctx.translate(c.x + o.x, c.y + o.y);
         ctx.rotate(Math.atan2(-f.y, -f.x));
         ctx.scale(sx * s, s);
-        if (M.extra > 0.5) { ctx.lineWidth = M.extra; ctx.strokeText(it.g, 0, M.offY); }
         ctx.fillText(it.g, 0, M.offY);
         ctx.restore();
       }
@@ -895,7 +892,7 @@
   // ---------- start ----------
   renderMute();
   const fontReady = document.fonts && document.fonts.load
-    ? Promise.race([document.fonts.load(`700 40px "Reem Kufi"`, 'سعد'), new Promise(r => setTimeout(r, 2500))])
+    ? Promise.race([document.fonts.load(`400 40px "Reem Kufi"`, 'سعد'), new Promise(r => setTimeout(r, 2500))])
     : Promise.resolve();
   fontReady.catch(() => {}).then(() => {
     fitBoard(true);
