@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <meta name="theme-color" content="#f4ead5">
-<title>ثعبان سعد</title>
+<title>حيّه</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Reem+Kufi:wght@700&family=Tajawal:wght@500;800&display=swap" rel="stylesheet">
@@ -71,6 +71,18 @@
   }
   .lead { font-size: 15px; color: var(--text); line-height: 1.7; }
   .lead .k { font-family: 'Reem Kufi', sans-serif; color: var(--ink); font-weight: 700; }
+  .preview { display: block; font-size: 30px; line-height: 1.6; min-height: 1.6em; }
+  .field { display: flex; flex-direction: column; gap: 6px; font-size: 14px; font-weight: 800; color: var(--muted); }
+  .field input {
+    font: 800 24px 'Tajawal', sans-serif; color: var(--ink-dark); text-align: center;
+    padding: 10px 14px; border: 0; border-radius: 14px; outline: none;
+    background: #f6ecd6; box-shadow: inset 0 0 0 2px #e6d4ae;
+    user-select: text; -webkit-user-select: text;
+  }
+  .field input:focus { box-shadow: inset 0 0 0 2px var(--ink); }
+  .field input::placeholder { color: #bba887; font-weight: 500; }
+  .msg { font-size: 13px; font-weight: 800; color: var(--accent); }
+  .msg[hidden] { display: none; }
   .modes { display: flex; flex-direction: column; gap: 10px; margin-top: 4px; }
   .mode {
     display: grid; grid-template-columns: 1fr auto; align-items: center; text-align: right;
@@ -115,9 +127,13 @@
 
 <section id="start" class="screen">
   <div class="card">
-    <div class="eyebrow">لعبة الثعبان</div>
-    <div id="titleName" class="name">سعد</div>
-    <p class="lead">كلما أكل سعد شيئًا طال <span class="k">ذيـــــلـــــهــــ</span><br><span class="k">سعد ← ـسعد ← ــسعد ← ـــسعد</span></p>
+    <div class="name">حَــيَّـــه</div>
+    <label class="field">
+      <span>اكتب اسمًا بالعربي</span>
+      <input id="nameInput" type="text" dir="rtl" lang="ar" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" enterkeyhint="done" placeholder="مثلًا: محمد">
+    </label>
+    <div id="nameMsg" class="msg" hidden></div>
+    <p class="lead">كلما أكل <b id="leadName">سعد</b> شيئًا طال اسمه:<span id="namePreview" class="k preview">سعد</span></p>
     <div class="modes">
       <button class="mode" data-mode="easy">
         <span class="m-name">سهل</span>
@@ -135,7 +151,7 @@
         <span class="m-desc">أسرع، مع صخور في الطريق</span>
       </button>
     </div>
-    <p class="howto">المس يمين الشاشة ليلتفّ سعد مع عقارب الساعة ↻<br>والمس يسارها ليلتفّ عكس عقارب الساعة ↺<br>☕ القهوة تبطّئ سعد خمس ثوانٍ.</p>
+    <p class="howto">المس يمين الشاشة ليلتفّ الثعبان مع عقارب الساعة ↻<br>والمس يسارها ليلتفّ عكس عقارب الساعة ↺<br>☕ القهوة تبطّئه خمس ثوانٍ.</p>
   </div>
 </section>
 
@@ -182,8 +198,12 @@
   const COLS = 12;
   const SLOW_MS = 5000, COFFEE_MS = 8000;
   const TATWEEL = 'ـ', ZWJ = '‍';
-  // Each letter is drawn in its own cell; zero-width joiners force the joined (connected) letter shapes.
-  const GLYPHS = { dal: ZWJ + 'د', ain: ZWJ + 'ع' + ZWJ, seenInit: 'س' + ZWJ, seenMid: ZWJ + 'س' + ZWJ };
+  // Arabic joining: these letters connect on both sides; these only to the letter before them
+  // (so no ـ can follow them); ء connects to nothing.
+  const DUAL = 'بتثجحخسشصضطظعغفقكلمنهيئى', RIGHT = 'اأإآدذرزوؤة';
+  const joinsAfter = ch => ch === TATWEEL || DUAL.includes(ch);
+  const joinsBefore = ch => ch === TATWEEL || DUAL.includes(ch) || RIGHT.includes(ch);
+  const MAX_NAME = 12, BULGE_STEP = 1.5;   // how many letters a swallowed lump slides down per step
   const SNAKE_FONT = '"Reem Kufi", "Noto Kufi Arabic", Tahoma, sans-serif';
   const EMOJI_FONT = '"Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", sans-serif';
   const DIRS = { up: { x: 0, y: -1 }, down: { x: 0, y: 1 }, left: { x: -1, y: 0 }, right: { x: 1, y: 0 } };
@@ -196,10 +216,47 @@
   const best = Object.assign({ easy: 0, normal: 0, hard: 0 }, store.get('saad.best', {}));
   let audio = null;
 
-  const elongated = n => TATWEEL.repeat(Math.min(n, 40)) + 'سعد';
   const rand = n => Math.floor(Math.random() * n);
   const same = (a, b) => a && b && a.x === b.x && a.y === b.y;
   const center = p => ({ x: p.x * cell + cell / 2, y: p.y * cell + cell / 2 });
+
+  // ---------- names ----------
+  // Keep Arabic letters only; harakat and ـ are dropped quietly.
+  const stripMarks = s => s.replace(/[ً-ٰٟـ]/g, '');
+  const cleanName = s => stripMarks(s).replace(/[^ء-غف-ي]/g, '').slice(0, MAX_NAME);
+
+  // Where the ـ go: every gap between two letters that join, nearest the head (end of the name)
+  // first. Gap k sits between letter k-1 and letter k. A name with no such gap (داود) stretches
+  // from its start instead (gap 0).
+  function stretchSpots(name) {
+    const spots = [];
+    for (let k = name.length - 1; k >= 1; k--) if (joinsAfter(name[k - 1]) && joinsBefore(name[k])) spots.push(k);
+    return spots.length ? spots : [0];
+  }
+
+  // The name in reading order with runs[k] ـ before letter k, each piece knowing whether it
+  // joins the next piece (ja) and the joined shape to draw it with (g).
+  function layout(name, runs) {
+    const out = [];
+    for (let k = 0; k < name.length; k++) {
+      for (let r = runs[k] || 0; r > 0; r--) out.push({ ch: TATWEEL, letter: false });
+      out.push({ ch: name[k], letter: true });
+    }
+    out.forEach((it, j) => {
+      const prev = out[j - 1], next = out[j + 1];
+      const jb = !!prev && joinsAfter(prev.ch) && joinsBefore(it.ch);
+      it.ja = !!next && joinsAfter(it.ch) && joinsBefore(next.ch);
+      it.g = (jb ? ZWJ : '') + it.ch + (it.ja ? ZWJ : '');
+    });
+    return out;
+  }
+
+  // The name after eating t things, handing the ـ out to the spots in turn.
+  function stretched(name, t) {
+    const spots = stretchSpots(name), runs = {};
+    for (let i = 0; i < Math.min(t, 40); i++) { const s = spots[i % spots.length]; runs[s] = (runs[s] || 0) + 1; }
+    return layout(name, runs).map(it => it.ch).join('');
+  }
 
   // ---------- sizing ----------
   function fitBoard(newGame) {
@@ -229,12 +286,15 @@
     // A little thicker than the font's own tatweel so the trail is easy to see; the letters
     // only get a light outline so their shapes stay readable.
     const body = Math.max(t * 1.3, cell * 0.22);
-    const glyphs = {};
-    for (const k in GLYPHS) {
-      const adv = ctx.measureText(GLYPHS[k]).width || cell;
-      glyphs[k] = { g: GLYPHS[k], sx: Math.max(0.55, Math.min(1.7, cell / adv)) };
+    return { fs, offY: (asc - desc) / 2, body, extra: Math.min(body - t, cell * 0.05), sx: {} };
+  }
+  // How much to squeeze or widen a letter so it fills about one cell.
+  function glyphScale(g) {
+    if (!(g in M.sx)) {
+      ctx.font = `700 ${M.fs}px ${SNAKE_FONT}`;
+      M.sx[g] = Math.max(0.55, Math.min(1.35, cell / (ctx.measureText(g).width || cell)));
     }
-    return { fs, offY: (asc - desc) / 2, body, extra: Math.min(body - t, cell * 0.05), glyphs };
+    return M.sx[g];
   }
 
   // ---------- sound & vibration ----------
@@ -273,16 +333,22 @@
   }
 
   // ---------- game ----------
-  function newGame(modeKey) {
+  function newGame(modeKey, name) {
     initAudio();
     show(null);
     fitBoard(true);
     const mode = MODES[modeKey];
-    const y = Math.floor(rows / 2), x = Math.floor(COLS / 2) - 1;
+    // The head is the name's last letter, so the name lies along the row reading right to left;
+    // a long name bends down at the right-hand wall.
+    const n = name.length, y = Math.floor(rows / 2), x = COLS / 2 - 1;
+    const spots = stretchSpots(name), runs = {};
+    spots.forEach(s => { runs[s] = 0; });
     S = {
-      modeKey, mode,
-      // index 0 = د (head), 1 = ع, 2 = س, then one ـ per thing eaten
-      snake: [{ x, y }, { x: x + 1, y }, { x: x + 2, y }],
+      modeKey, mode, name, spots, runs, items: layout(name, runs).reverse(),
+      snake: Array.from({ length: n }, (_, i) => ({ x: Math.min(COLS - 1, x + i), y: y + Math.max(0, x + i - (COLS - 1)) })),
+      // prevTail: the cell the tail just left; grewAt: the snake index where a ـ was just added
+      // (pieces from there back stay still while the front glides on).
+      prevTail: null, grewAt: 0, bulges: [], settling: null, mouth: 0,
       dir: DIRS.left, lastDir: DIRS.left, queue: [],
       food: null, coffee: null, rocks: [],
       score: 0, eaten: 0, slowLeft: 0, acc: 0, last: performance.now(),
@@ -330,7 +396,7 @@
     if (S.queue.length < 3) S.queue.push(d);
   }
 
-  // Turn to سعد's own left or right, relative to where he is (or is about to be) heading.
+  // Turn to the snake's own left or right, relative to where it is (or is about to be) heading.
   function turnSide(side) {
     if (!S || S.state !== 'run' || S.queue.length >= 3) return;
     const p = heading();
@@ -344,6 +410,24 @@
     return S.slowLeft > 0 ? base * 1.7 : base;
   }
 
+  // Snake index where the next ـ for a spot goes: the middle of that spot's stretch, just
+  // behind (tail side of) the letter the stretch sits before.
+  function target(spot) {
+    let pos = S.runs[spot];
+    for (let k = 0; k < spot; k++) pos += 1 + (S.runs[k] || 0);
+    return S.snake.length - pos + Math.floor(S.runs[spot] / 2);
+  }
+
+  // Spread the ـ between the spots, counting food still on its way down.
+  function pickSpot() {
+    let best = S.spots[0], fewest = Infinity;
+    for (const s of S.spots) {
+      const n = S.runs[s] + S.bulges.filter(b => b.spot === s).length;
+      if (n < fewest) { best = s; fewest = n; }
+    }
+    return best;
+  }
+
   function step(now) {
     if (S.queue.length) S.dir = S.queue.shift();
     const h = S.snake[0];
@@ -352,27 +436,51 @@
     else if (nx < 0 || ny < 0 || nx >= COLS || ny >= rows) return die(now);
     const next = { x: nx, y: ny };
     const eatsFood = same(S.food, next), eatsCoffee = same(S.coffee, next);
+    // Swallowed food travels down the body; the name grows only once a lump reaches the tummy.
+    const arrived = S.bulges.find(b => b.b + BULGE_STEP >= target(b.spot));
     // The tail moves out of the way this step unless the snake is growing.
-    const body = (eatsFood || eatsCoffee) ? S.snake : S.snake.slice(0, -1);
+    const body = arrived ? S.snake : S.snake.slice(0, -1);
     if (body.some(p => same(p, next)) || S.rocks.some(r => same(r, next))) return die(now);
 
+    const grewAt = arrived ? target(arrived.spot) : Infinity;
+    S.bulges.forEach(b => { if (b.b < 0) swallowed(b, now); b.b += BULGE_STEP; });
     S.snake.unshift(next);
     S.lastDir = S.dir;
+    S.grewAt = grewAt;
+    S.settling = arrived ? grewAt : null;   // the lump fades there while the new ـ opens up
+    if (arrived) {
+      S.runs[arrived.spot]++;
+      S.items = layout(S.name, S.runs).reverse();
+      S.bulges.splice(S.bulges.indexOf(arrived), 1);
+      S.prevTail = null;
+    } else {
+      S.prevTail = S.snake.pop();
+    }
+
+    if (eatsFood || eatsCoffee) {
+      // In its mouth now; it reaches the head (and crunches) at the end of this step's glide.
+      S.bulges.push({ b: -BULGE_STEP, spot: pickSpot(), ch: eatsFood ? S.food.ch : '☕', coffee: eatsCoffee, cell: next });
+      S.score++;
+    }
     if (eatsFood) {
-      S.score++; S.eaten++;
-      burst(next, now); floater(next, '+1', now);
-      sfx.eat(); vib(25);
+      S.eaten++;
       spawnFood(now);
       maybeCoffee(now);
       if (!S.food && !emptyCell()) { S.won = true; return die(now); }
     } else if (eatsCoffee) {
-      S.score++; S.coffee = null; S.slowLeft = SLOW_MS;
-      burst(next, now, ['#6b3f1f', '#a0703f', '#d9b48f']); floater(next, 'أبطأ!', now);
-      sfx.coffee(); vib([20, 40, 20]);
-    } else {
-      S.snake.pop();
+      S.coffee = null; S.slowLeft = SLOW_MS;
     }
     updateHud();
+  }
+
+  function swallowed(b, now) {
+    if (b.coffee) {
+      burst(b.cell, now, ['#6b3f1f', '#a0703f', '#d9b48f']); floater(b.cell, 'أبطأ!', now);
+      sfx.coffee(); vib([20, 40, 20]);
+    } else {
+      burst(b.cell, now); floater(b.cell, '+1', now);
+      sfx.eat(); vib(25);
+    }
   }
 
   function die(now) {
@@ -434,61 +542,174 @@
     return { x: dx, y: dy };
   }
 
+  // How far through the current step the snake is (0 → 1). The snake is drawn gliding from
+  // where it was to where it now is, so a turn always happens at the cell the head is entering.
+  function glide() { return S.state === 'dead' ? 1 : Math.min(1, S.acc / interval()); }
+  const ease = t => t * t * (3 - 2 * t);
+
+  // Centres along the body from the head back to the tail (and the cell the tail just left),
+  // unwrapped so a body crossing an edge in easy mode stays one continuous line.
+  function bodyPath() {
+    const sn = S.snake, cells = S.prevTail ? sn.concat([S.prevTail]) : sn;
+    const pts = [center(sn[0])];
+    for (let k = 1; k < cells.length; k++) {
+      const d = stepDir(cells[k - 1], cells[k]), q = pts[k - 1];
+      pts.push({ x: q.x + d.x * cell, y: q.y + d.y * cell });
+    }
+    return pts;
+  }
+  // The point d cells back from the head along the body.
+  function at(pts, d) {
+    if (pts.length < 2) return pts[0];
+    d = Math.max(0, Math.min(pts.length - 1, d));
+    const k = Math.min(pts.length - 2, Math.floor(d)), f = d - k, a = pts[k], b = pts[k + 1];
+    return { x: a.x + (b.x - a.x) * f, y: a.y + (b.y - a.y) * f };
+  }
+  // The stretch of body between two such distances.
+  function piece(pts, d1, d2) {
+    const out = [at(pts, d1)];
+    for (let k = Math.floor(d1) + 1; k < d2 && k < pts.length; k++) out.push(pts[k]);
+    out.push(at(pts, d2));
+    return out;
+  }
+  // Offsets that bring a box back onto the board. Off the board is only possible in easy mode,
+  // where whatever pokes off one edge is drawn again coming in at the opposite one.
+  const HERE = [{ x: 0, y: 0 }];
+  function tiles(x0, y0, x1, y1, pad) {
+    if (!S.mode.wrap) return HERE;
+    const out = [];
+    for (let i = Math.floor((x0 - pad) / W); i <= Math.floor((x1 + pad) / W); i++)
+      for (let j = Math.floor((y0 - pad) / H); j <= Math.floor((y1 + pad) / H); j++) out.push({ x: -i * W, y: -j * H });
+    return out;
+  }
+  function tracePieces(list, pad) {
+    ctx.beginPath();
+    for (const ps of list) {
+      const xs = ps.map(q => q.x), ys = ps.map(q => q.y);
+      for (const o of tiles(Math.min(...xs), Math.min(...ys), Math.max(...xs), Math.max(...ys), pad)) {
+        ctx.moveTo(ps[0].x + o.x, ps[0].y + o.y);
+        for (let k = 1; k < ps.length; k++) ctx.lineTo(ps[k].x + o.x, ps[k].y + o.y);
+      }
+    }
+  }
+
   function drawSnake(now) {
-    const sn = S.snake;
+    const items = S.items, L = items.length, p = glide();
     const dead = S.state === 'dead';
     const color = dead && Math.floor((now - S.deadAt) / 120) % 2 ? DEAD : INK;
+    const pts = bodyPath();
+    const lag = i => (i < S.grewAt ? 1 - p : 0);
+    const dist = items.map((_, i) => i + lag(i));
+    // Which way the body points at a spot, averaged over a cell so letters swing round corners.
+    const fwd = d => {
+      const a = at(pts, d - 0.5), b = at(pts, d + 0.5), x = a.x - b.x, y = a.y - b.y, n = Math.hypot(x, y);
+      return n > 1e-6 ? { x: x / n, y: y / n } : S.lastDir;
+    };
 
-    // The stretched tatweel: one continuous ink line from the tail to the head.
-    ctx.save();
-    ctx.strokeStyle = color; ctx.lineWidth = M.body; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
-    ctx.shadowColor = 'rgba(70,45,10,.25)'; ctx.shadowBlur = cell * 0.15; ctx.shadowOffsetY = cell * 0.08;
-    ctx.beginPath();
-    for (let i = sn.length - 1; i >= 0; i--) {
-      const c = center(sn[i]);
-      if (i === sn.length - 1) { ctx.moveTo(c.x, c.y); continue; }
-      const q = sn[i + 1];
-      if (Math.abs(sn[i].x - q.x) + Math.abs(sn[i].y - q.y) > 1) {   // crossed an edge (easy mode)
-        const d = stepDir(q, sn[i]), qc = center(q);
-        ctx.lineTo(qc.x + d.x * cell / 2, qc.y + d.y * cell / 2);
-        ctx.moveTo(c.x - d.x * cell / 2, c.y - d.y * cell / 2);
-      }
-      ctx.lineTo(c.x, c.y);
+    // The body line: thick where letters join (and through the ـ stretch), a thin faint neck
+    // between letters that don't join, so the name still reads right.
+    const joined = [], loose = [];
+    let run = null, runJoined = null;
+    for (let i = 0; i < L - 1; i++) {
+      const j = items[i + 1].ja, ps = piece(pts, dist[i], dist[i + 1]);
+      if (run && runJoined === j) run.push(...ps.slice(1));
+      else { run = ps; runJoined = j; (j ? joined : loose).push(run); }
     }
-    ctx.stroke();
+    ctx.save();
+    ctx.strokeStyle = color; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+    ctx.globalAlpha = 0.45; ctx.lineWidth = M.body * 0.45;
+    tracePieces(loose, cell); ctx.stroke();
+    ctx.globalAlpha = 1; ctx.lineWidth = M.body;
+    ctx.shadowColor = 'rgba(70,45,10,.25)'; ctx.shadowBlur = cell * 0.15; ctx.shadowOffsetY = cell * 0.08;
+    tracePieces(joined, cell); ctx.stroke();
     ctx.restore();
 
-    // The letters د ع س, each turned to face the way that part of the snake is moving.
-    for (let i = Math.min(2, sn.length - 1); i >= 0; i--) {
-      const f = i === 0 ? S.lastDir : stepDir(sn[i], sn[i - 1]);
-      const key = i === 0 ? 'dal' : i === 1 ? 'ain' : (sn.length > 3 ? 'seenMid' : 'seenInit');
-      const g = M.glyphs[key], c = center(sn[i]);
-      ctx.save();
-      ctx.translate(c.x, c.y);
-      ctx.rotate(Math.atan2(-f.y, -f.x));
-      ctx.scale(g.sx, 1);
-      ctx.font = `700 ${M.fs}px ${SNAKE_FONT}`;
-      ctx.textAlign = 'center'; ctx.textBaseline = 'alphabetic';
-      ctx.fillStyle = color; ctx.strokeStyle = color; ctx.lineJoin = 'round';
-      if (M.extra > 0.5) { ctx.lineWidth = M.extra; ctx.strokeText(g.g, 0, M.offY); }
-      ctx.fillText(g.g, 0, M.offY);
-      ctx.restore();
+    // Swallowed food: a lump that slides down to the tummy, swelling the letters it passes.
+    const lumps = [];
+    for (const b of S.bulges) {
+      const bv = Math.min(target(b.spot), b.b + BULGE_STEP * p);
+      if (bv > 0) lumps.push({ d: bv + lag(bv), amp: ease(Math.min(1, bv / 0.6)) });
+    }
+    if (S.settling !== null) lumps.push({ d: S.settling, amp: 1 - ease(p) });
+    for (const l of lumps) {
+      if (l.amp < 0.03) continue;
+      const c = at(pts, l.d), f = fwd(l.d);
+      for (const o of tiles(c.x, c.y, c.x, c.y, cell)) {
+        ctx.beginPath();
+        ctx.ellipse(c.x + o.x, c.y + o.y, cell * 0.36 * l.amp + M.body / 2, cell * 0.2 * l.amp + M.body / 2, Math.atan2(f.y, f.x), 0, Math.PI * 2);
+        ctx.fillStyle = '#5fae84'; ctx.fill();
+        ctx.lineWidth = Math.max(1.5, M.body * 0.4); ctx.strokeStyle = color; ctx.stroke();
+      }
     }
 
-    // A little tongue that flicks out now and then.
-    if (S.state === 'run' && now % 1500 < 260) {
-      const h = center(sn[0]), f = S.lastDir, px = -f.y, py = f.x;
-      const sx = h.x + f.x * cell * 0.55, sy = h.y + f.y * cell * 0.55;
-      const ex = sx + f.x * cell * 0.3, ey = sy + f.y * cell * 0.3;
-      ctx.save();
-      ctx.strokeStyle = '#d63b3b'; ctx.lineWidth = Math.max(1.5, cell * 0.07); ctx.lineCap = 'round';
-      ctx.beginPath();
-      ctx.moveTo(sx, sy); ctx.lineTo(ex, ey);
-      ctx.moveTo(ex, ey); ctx.lineTo(ex + f.x * cell * 0.13 + px * cell * 0.1, ey + f.y * cell * 0.13 + py * cell * 0.1);
-      ctx.moveTo(ex, ey); ctx.lineTo(ex + f.x * cell * 0.13 - px * cell * 0.1, ey + f.y * cell * 0.13 - py * cell * 0.1);
-      ctx.stroke();
-      ctx.restore();
+    // The letters, each turned to face the way that part of the body is moving.
+    ctx.font = `700 ${M.fs}px ${SNAKE_FONT}`;
+    ctx.textAlign = 'center'; ctx.textBaseline = 'alphabetic';
+    ctx.fillStyle = color; ctx.strokeStyle = color; ctx.lineJoin = 'round';
+    for (let i = L - 1; i >= 0; i--) {
+      const it = items[i];
+      if (!it.letter) continue;
+      const c = at(pts, dist[i]), f = fwd(dist[i]), sx = glyphScale(it.g);
+      let swell = 0;
+      for (const l of lumps) swell = Math.max(swell, l.amp * (1 - Math.abs(dist[i] - l.d)));
+      const s = 1 + 0.25 * swell;
+      for (const o of tiles(c.x, c.y, c.x, c.y, cell)) {
+        ctx.save();
+        ctx.translate(c.x + o.x, c.y + o.y);
+        ctx.rotate(Math.atan2(-f.y, -f.x));
+        ctx.scale(sx * s, s);
+        if (M.extra > 0.5) { ctx.lineWidth = M.extra; ctx.strokeText(it.g, 0, M.offY); }
+        ctx.fillText(it.g, 0, M.offY);
+        ctx.restore();
+      }
     }
+
+    // Food the head is closing in on, shrinking between the open jaws.
+    S.bulges.forEach(b => { if (b.b + BULGE_STEP * p < 0) drawEmoji(b.ch, b.cell, 0.85 - 0.4 * p); });
+
+    const h = at(pts, dist[0]), f = fwd(dist[0]), px = -f.y, py = f.x;
+    for (const o of tiles(h.x, h.y, h.x, h.y, cell * 1.5)) {
+      const hx = h.x + o.x, hy = h.y + o.y;
+      if (S.mouth > 0.03) {
+        // Jaws opening in front of the head letter.
+        const len = cell * 0.55 * Math.min(1, S.mouth * 2.5), a = S.mouth * 0.8;
+        const jx = hx + f.x * cell * 0.32, jy = hy + f.y * cell * 0.32;
+        const cs = Math.cos(a) * len, sn = Math.sin(a) * len;
+        const ux = jx + f.x * cs + px * sn, uy = jy + f.y * cs + py * sn;
+        const lx = jx + f.x * cs - px * sn, ly = jy + f.y * cs - py * sn;
+        ctx.save();
+        ctx.beginPath(); ctx.moveTo(jx, jy); ctx.lineTo(ux, uy); ctx.lineTo(lx, ly); ctx.closePath();
+        ctx.fillStyle = '#b3302b'; ctx.fill();
+        ctx.beginPath(); ctx.moveTo(ux, uy); ctx.lineTo(jx, jy); ctx.lineTo(lx, ly);
+        ctx.strokeStyle = color; ctx.lineWidth = M.body; ctx.lineCap = 'round'; ctx.lineJoin = 'round'; ctx.stroke();
+        ctx.restore();
+      } else if (S.state === 'run' && now % 1500 < 260) {
+        // A little tongue that flicks out now and then.
+        const sx = hx + f.x * cell * 0.55, sy = hy + f.y * cell * 0.55;
+        const ex = sx + f.x * cell * 0.3, ey = sy + f.y * cell * 0.3;
+        ctx.save();
+        ctx.strokeStyle = '#d63b3b'; ctx.lineWidth = Math.max(1.5, cell * 0.07); ctx.lineCap = 'round';
+        ctx.beginPath();
+        ctx.moveTo(sx, sy); ctx.lineTo(ex, ey);
+        ctx.moveTo(ex, ey); ctx.lineTo(ex + f.x * cell * 0.13 + px * cell * 0.1, ey + f.y * cell * 0.13 + py * cell * 0.1);
+        ctx.moveTo(ex, ey); ctx.lineTo(ex + f.x * cell * 0.13 - px * cell * 0.1, ey + f.y * cell * 0.13 - py * cell * 0.1);
+        ctx.stroke();
+        ctx.restore();
+      }
+    }
+  }
+
+  // Open wide when food is just ahead, and keep it open until the food is in.
+  function mouthWant() {
+    if (S.bulges.some(b => b.b < 0)) return 1;
+    const d = S.queue[0] || S.dir;
+    let c = S.snake[0];
+    for (let k = 1; k <= 2; k++) {
+      c = { x: c.x + d.x, y: c.y + d.y };
+      if (S.mode.wrap) c = { x: (c.x + COLS) % COLS, y: (c.y + rows) % rows };
+      if (same(S.food, c) || same(S.coffee, c)) return k === 1 ? 1 : 0.55;
+    }
+    return 0;
   }
 
   function draw(now) {
@@ -512,7 +733,6 @@
       ctx.restore();
       drawEmoji('☕', S.coffee, 0.95);
     }
-
     drawSnake(now);
 
     S.particles = S.particles.filter(p => now - p.born < 500);
@@ -548,6 +768,7 @@
       S.acc += dt;
       let iv = interval();
       while (S.acc >= iv && S.state === 'run') { S.acc -= iv; step(now); iv = interval(); }
+      if (S.state === 'run') S.mouth += (mouthWant() - S.mouth) * Math.min(1, dt / 70);
       const sl = S.slowLeft > 0 ? Math.ceil(S.slowLeft / 1000) : 0;
       if (sl !== shownSlow) { shownSlow = sl; $('slow').hidden = !sl; $('slowN').textContent = sl; }
     } else if (S) {
@@ -564,9 +785,15 @@
     if (id === 'start') {
       ['easy', 'normal', 'hard'].forEach(k => { $('best-' + k).textContent = best[k] || 0; });
       let n = 0;
-      $('titleName').textContent = elongated(0);
-      titleTimer = setInterval(() => { n = (n + 1) % 9; $('titleName').textContent = elongated(n); }, 380);
+      renderPreview(0);
+      titleTimer = setInterval(() => { n = (n + 1) % 9; renderPreview(n); }, 380);
     }
+  }
+  // The start screen shows the typed name stretching, so players see what will happen.
+  function renderPreview(n) {
+    const name = cleanName(nameInput.value);
+    $('leadName').textContent = name || 'الثعبان';
+    $('namePreview').textContent = name ? stretched(name, n) : '';
   }
   function updateHud() {
     $('score').textContent = S ? S.score : 0;
@@ -574,10 +801,10 @@
   }
   function showGameOver(isBest) {
     if (!S || S.state !== 'dead') return;
-    $('overTitle').textContent = S.won ? 'ملأ سعد الملعب! 🏆' : 'انتهت اللعبة';
+    $('overTitle').textContent = S.won ? `ملأ ${S.name} الملعب! 🏆` : 'انتهت اللعبة';
     const nameEl = $('overName');
-    nameEl.textContent = elongated(S.score);
-    nameEl.style.fontSize = Math.max(24, 56 - S.score * 1.1) + 'px';
+    nameEl.textContent = stretched(S.name, S.score);
+    nameEl.style.fontSize = Math.max(24, 56 - S.score * 1.1 - Math.max(0, S.name.length - 3) * 4) + 'px';
     $('overScore').textContent = S.score;
     $('overBestLabel').textContent = 'الأفضل (' + S.mode.name + ')';
     $('overBest').textContent = best[S.modeKey] || 0;
@@ -604,15 +831,41 @@
   function shareScore() {
     if (!S) return;
     const link = /^https?:$/.test(location.protocol) ? location.href.split('#')[0] : '';
-    const text = `صار اسمي ${elongated(S.score)} 🐍\nجمعت ${S.score} نقطة في لعبة ثعبان سعد (${S.mode.name})` +
+    const text = `صار اسمي ${stretched(S.name, S.score)} 🐍\nجمعت ${S.score} نقطة في لعبة حيّه (${S.mode.name})` +
       (link ? `\nجرّبها: ${link}` : '');
     if (navigator.share) navigator.share({ text }).catch(() => {});
-    else window.open('https://wa.me/?text=' + encodeURIComponent(text), '_blank');
+    // wa.me's redirect garbles emoji, so go straight to the full address.
+    else window.open('https://api.whatsapp.com/send?text=' + encodeURIComponent(text), '_blank');
   }
 
   // ---------- input ----------
-  document.querySelectorAll('.mode').forEach(b => b.addEventListener('click', () => newGame(b.dataset.mode)));
-  $('again').addEventListener('click', () => newGame(S ? S.modeKey : 'normal'));
+  // Name box: Arabic letters only, up to MAX_NAME. Only rewrite the box when something had to be
+  // removed, so phone keyboards that compose words as you type are left alone.
+  const nameInput = $('nameInput');
+  nameInput.value = store.get('saad.name', 'سعد');
+  function nameMsg(text) { $('nameMsg').textContent = text || ''; $('nameMsg').hidden = !text; }
+  function tidyName() {
+    const raw = nameInput.value, letters = stripMarks(raw), clean = cleanName(raw);
+    if (clean !== raw) nameInput.value = clean;
+    if (/[^ء-غف-ي]/.test(letters)) nameMsg('حروف عربية فقط');
+    else if (letters.length > MAX_NAME) nameMsg(`${MAX_NAME} حروف على الأكثر`);
+    else nameMsg('');
+    renderPreview(0);
+  }
+  nameInput.addEventListener('input', e => { if (!e.isComposing) tidyName(); });
+  nameInput.addEventListener('compositionend', tidyName);
+  nameInput.addEventListener('keydown', e => { if (e.key === 'Enter') nameInput.blur(); });
+
+  function startGame(modeKey) {
+    const name = cleanName(nameInput.value);
+    if (!name) { nameMsg('اكتب الاسم أولًا'); nameInput.focus(); return; }
+    store.set('saad.name', name);
+    // Let the phone keyboard close first, so the board is sized for the full screen.
+    if (document.activeElement === nameInput) { nameInput.blur(); setTimeout(() => newGame(modeKey, name), 300); }
+    else newGame(modeKey, name);
+  }
+  document.querySelectorAll('.mode').forEach(b => b.addEventListener('click', () => startGame(b.dataset.mode)));
+  $('again').addEventListener('click', () => newGame(S ? S.modeKey : 'normal', S ? S.name : 'سعد'));
   $('share').addEventListener('click', shareScore);
   $('overMenu').addEventListener('click', toMenu);
   $('pauseMenu').addEventListener('click', toMenu);
@@ -623,8 +876,8 @@
     if (!muted) { initAudio(); sfx.tap(); }
   });
 
-  // Two-side controls: tap the left half of the screen to turn to سعد's left, the right half
-  // to turn to his right.
+  // Two-side controls: tap the left half of the screen to turn to the snake's left, the right
+  // half to turn to its right.
   $('app').addEventListener('pointerdown', e => {
     if (!S || S.state !== 'run' || e.target.closest('button')) return;
     e.preventDefault();
@@ -634,6 +887,7 @@
 
   const KEYS = { ArrowUp: 'up', ArrowDown: 'down', ArrowLeft: 'left', ArrowRight: 'right', w: 'up', s: 'down', a: 'left', d: 'right' };
   document.addEventListener('keydown', e => {
+    if (e.target === nameInput) return;
     if (KEYS[e.key]) { e.preventDefault(); turn(KEYS[e.key]); }
     else if (e.key === ' ' || e.key === 'Escape') { (S && S.state === 'paused') ? resume() : pause(); }
   });
