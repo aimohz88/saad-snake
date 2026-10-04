@@ -338,29 +338,46 @@
   };
   function vib(p) { try { if (navigator.vibrate) navigator.vibrate(p); } catch (e) {} }
 
-  // Voice taunts for losing (يا غشيم هاهاها…), one picked at random, never the same twice in a
-  // row. Loaded once sound is allowed (first tap); until they arrive, losing just plays the tone.
-  const TAUNTS = ['ghashim', 'hataf', 'sabak', 'dalakh', 'fashil', 'loser', 'saad'];
-  let taunts = null, lastTaunt = -1;
+  // Losing gets a taunt: a voice (يا غشيم، يا سعد…) and then a cartoon laugh, both picked at
+  // random. A short laugh is followed by another, so the taunt lasts from the crash until a
+  // couple of seconds into the game-over screen. Loaded once sound is allowed (first tap);
+  // until they arrive, losing just plays the tone.
+  const SAYS = ['ghashim', 'hataf', 'sabak', 'dalakh', 'fashil', 'loser', 'saad'];
+  const LAUGHS = ['monkey', 'hyena', 'giggle', 'cartoon'];   // from mixkit.co (free licence)
+  const TAUNT_SECS = 2.2;
+  let clips = null, lastSay = '';
   function loadTaunts() {
-    if (taunts || !audio) return;
-    taunts = [];
-    TAUNTS.forEach((name, i) => {
+    if (clips || !audio) return;
+    clips = {};
+    SAYS.map(n => 'say-' + n).concat(LAUGHS.map(n => 'laugh-' + n)).forEach(name => {
       fetch(`sounds/${name}.mp3`).then(r => r.arrayBuffer()).then(b => audio.decodeAudioData(b))
-        .then(buf => { taunts[i] = buf; }).catch(() => {});
+        .then(buf => { clips[name] = buf; }).catch(() => {});
     });
+  }
+  // Pick a loaded clip from a list at random, skipping the ones named in `not`.
+  function pickClip(prefix, names, not) {
+    const ready = names.map(n => prefix + n).filter(n => clips[n] && !not.includes(n));
+    return ready.length ? ready[rand(ready.length)] : null;
   }
   // Returns how long the taunt lasts, in seconds (0 if none played).
   function taunt() {
-    if (muted || !audio || !taunts) return 0;
-    let ready = TAUNTS.map((_, i) => i).filter(i => taunts[i]);
-    if (ready.length > 1) ready = ready.filter(i => i !== lastTaunt);
-    if (!ready.length) return 0;
-    const i = ready[rand(ready.length)], src = audio.createBufferSource(), g = audio.createGain();
-    lastTaunt = i;
-    src.buffer = taunts[i]; g.gain.value = 0.8;
-    src.connect(g); g.connect(audio.destination); src.start();
-    return taunts[i].duration;
+    if (muted || !audio || !clips) return 0;
+    const say = pickClip('say-', SAYS, [lastSay]) || pickClip('say-', SAYS, []);
+    if (!say) return 0;
+    lastSay = say;
+    const order = [say];
+    let total = clips[say].duration;
+    for (let laugh; total < TAUNT_SECS && (laugh = pickClip('laugh-', LAUGHS, order)); total += clips[laugh].duration + 0.05)
+      order.push(laugh);
+    const g = audio.createGain();
+    g.gain.value = 0.8; g.connect(audio.destination);
+    let t = audio.currentTime;
+    order.forEach(name => {
+      const src = audio.createBufferSource();
+      src.buffer = clips[name]; src.connect(g); src.start(t);
+      t += clips[name].duration + 0.05;
+    });
+    return t - audio.currentTime;
   }
 
   function renderMute() {
