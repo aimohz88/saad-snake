@@ -313,6 +313,7 @@
     try {
       if (!audio) audio = new (window.AudioContext || window.webkitAudioContext)();
       if (audio.state === 'suspended') audio.resume();
+      loadTaunts();
     } catch (e) {}
   }
   function tone(f1, f2, dur, type, vol, delay) {
@@ -336,6 +337,31 @@
     tap()    { tone(660, 0, 0.04, 'square', 0.05); },
   };
   function vib(p) { try { if (navigator.vibrate) navigator.vibrate(p); } catch (e) {} }
+
+  // Voice taunts for losing (يا غشيم هاهاها…), one picked at random, never the same twice in a
+  // row. Loaded once sound is allowed (first tap); until they arrive, losing just plays the tone.
+  const TAUNTS = ['ghashim', 'hataf', 'sabak', 'dalakh', 'fashil', 'loser', 'saad'];
+  let taunts = null, lastTaunt = -1;
+  function loadTaunts() {
+    if (taunts || !audio) return;
+    taunts = [];
+    TAUNTS.forEach((name, i) => {
+      fetch(`sounds/${name}.mp3`).then(r => r.arrayBuffer()).then(b => audio.decodeAudioData(b))
+        .then(buf => { taunts[i] = buf; }).catch(() => {});
+    });
+  }
+  // Returns how long the taunt lasts, in seconds (0 if none played).
+  function taunt() {
+    if (muted || !audio || !taunts) return 0;
+    let ready = TAUNTS.map((_, i) => i).filter(i => taunts[i]);
+    if (ready.length > 1) ready = ready.filter(i => i !== lastTaunt);
+    if (!ready.length) return 0;
+    const i = ready[rand(ready.length)], src = audio.createBufferSource(), g = audio.createGain();
+    lastTaunt = i;
+    src.buffer = taunts[i]; g.gain.value = 0.8;
+    src.connect(g); g.connect(audio.destination); src.start();
+    return taunts[i].duration;
+  }
 
   function renderMute() {
     $('mute').innerHTML = muted
@@ -496,10 +522,12 @@
 
   function die(now) {
     S.state = 'dead'; S.deadAt = now;
-    sfx.over(); vib([90, 60, 160]);
+    const said = S.won ? 0 : taunt();
+    if (!said) sfx.over();
+    vib([90, 60, 160]);
     const isBest = S.score > 0 && S.score > (best[S.modeKey] || 0);
     if (isBest) { best[S.modeKey] = S.score; store.set('saad.best', best); }
-    setTimeout(() => showGameOver(isBest), 750);
+    setTimeout(() => showGameOver(isBest, said), 750);
   }
 
   function burst(p, now, colors) {
@@ -829,7 +857,7 @@
     $('score').textContent = S ? S.score : 0;
     $('best').textContent = S ? Math.max(best[S.modeKey] || 0, S.score) : 0;
   }
-  function showGameOver(isBest) {
+  function showGameOver(isBest, said) {
     if (!S || S.state !== 'dead') return;
     $('overTitle').textContent = S.won ? `ملأ ${S.name} الملعب! 🏆` : 'انتهت اللعبة';
     const nameEl = $('overName');
@@ -840,7 +868,8 @@
     $('overBest').textContent = best[S.modeKey] || 0;
     $('newBest').hidden = !isBest;
     show('over');
-    if (isBest) sfx.best();
+    // A new record still gets its fanfare, once the taunt has finished.
+    if (isBest) setTimeout(sfx.best, Math.max(0, (said || 0) * 1000 - 750));
   }
   function pause() {
     if (!S || S.state !== 'run') return;
