@@ -606,20 +606,17 @@
       return n > 1e-6 ? { x: x / n, y: y / n } : S.lastDir;
     };
 
-    // The body line: thick where letters join (and through the ـ stretch), a thin faint neck
-    // between letters that don't join, so the name still reads right.
-    const joined = [], loose = [];
-    let run = null, runJoined = null;
+    // The body line runs only where letters join (and through the ـ stretch); letters that
+    // don't join (ز و in عزوز) just sit apart, as in normal writing.
+    const joined = [];
+    let run = null;
     for (let i = 0; i < L - 1; i++) {
-      const j = items[i + 1].ja, ps = piece(pts, dist[i], dist[i + 1]);
-      if (run && runJoined === j) run.push(...ps.slice(1));
-      else { run = ps; runJoined = j; (j ? joined : loose).push(run); }
+      if (!items[i + 1].ja) { run = null; continue; }
+      const ps = piece(pts, dist[i], dist[i + 1]);
+      if (run) run.push(...ps.slice(1)); else joined.push(run = ps);
     }
     ctx.save();
-    ctx.strokeStyle = color; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
-    ctx.globalAlpha = 0.45; ctx.lineWidth = M.body * 0.45;
-    tracePieces(loose, cell); ctx.stroke();
-    ctx.globalAlpha = 1; ctx.lineWidth = M.body;
+    ctx.strokeStyle = color; ctx.lineCap = 'round'; ctx.lineJoin = 'round'; ctx.lineWidth = M.body;
     ctx.shadowColor = 'rgba(70,45,10,.25)'; ctx.shadowBlur = cell * 0.15; ctx.shadowOffsetY = cell * 0.08;
     tracePieces(joined, cell); ctx.stroke();
     ctx.restore();
