@@ -82,6 +82,7 @@
   .field input:focus { box-shadow: inset 0 0 0 2px var(--ink); }
   .field input::placeholder { color: #bba887; font-weight: 500; }
   .msg { font-size: 13px; font-weight: 800; color: var(--accent); }
+  .version { font-size: 12px; font-weight: 500; color: var(--muted); margin-top: -14px; }
   .msg[hidden] { display: none; }
   .modes { display: flex; flex-direction: column; gap: 10px; margin-top: 4px; }
   .mode {
@@ -128,6 +129,7 @@
 <section id="start" class="screen">
   <div class="card">
     <div class="name">حَــيَّـــه</div>
+    <div class="version" dir="ltr">version 1.0.17</div>
     <label class="field">
       <span>اكتب اسمًا بالعربي</span>
       <input id="nameInput" type="text" dir="rtl" lang="ar" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" enterkeyhint="done" placeholder="مثلًا: محمد">
